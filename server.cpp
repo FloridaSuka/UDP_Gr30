@@ -139,3 +139,78 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
         ofstream f(DATA_DIR + "/" + arg);
         return (f << content) ? "Ngarkuar me sukses.\n" : "Ngarkimi deshtoi.\n";
     }
+    int main() {
+        WSADATA wsa;
+        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+            cerr << "WSAStartup deshtoi!\n";
+            return 1;
+        }
+        fs::create_directories(DATA_DIR);
+        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        sockaddr_in serv{};
+        serv.sin_family = AF_INET;
+        serv.sin_port = htons(SERVER_PORT);
+        inet_pton(AF_INET, SERVER_IP.c_str(), &serv.sin_addr);
+        if (bind(sockfd, (sockaddr*)&serv, sizeof(serv)) == SOCKET_ERROR) {
+            cerr << "Bind deshtoi: " << WSAGetLastError() << endl;
+            return 1;
+        }
+
+        cout << "==================================================\n";
+        cout << " UDP SERVER AKTIV - " << SERVER_IP << ":" << SERVER_PORT << endl;
+        cout << " Admin = Vetem IP: " << SERVER_IP << "\n";
+        cout << " Minimumi " << MIN_CLIENTS << " kliente, maksimumi " << MAX_CLIENTS << "\n";
+        cout << "==================================================\n\n";
+
+        thread(stats_thread).detach();
+        thread(cleanup_thread).detach();
+
+        char buffer[131072];
+        sockaddr_in client_addr{};
+        int addrlen = sizeof(client_addr);
+
+        while (running) {
+            int n = recvfrom(sockfd, buffer, sizeof(buffer) - 1, 0, (sockaddr*)&client_addr, &addrlen);
+            if (n <= 0) continue;
+            buffer[n] = '\0';
+            string request(buffer);
+            string key = addr_key(client_addr);
+
+            if (request != "PING") {
+                log_message(inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), request);
+            }
+
+            Client* cl = nullptr;
+            bool is_admin = false;
+            int client_port = 0;
+
+            {
+                lock_guard<mutex> lock(clients_mtx);
+
+                if (request == "PING") {
+                    sendto(sockfd, "PONG", 4, 0, (sockaddr*)&client_addr, addrlen);
+                    continue;
+                }
+
+                if (clients.find(key) == clients.end()) {
+                    if (clients.size() >= MAX_CLIENTS) {
+                        string msg = "GABIM: Serveri plot (maksimumi " + to_string(MAX_CLIENTS) + " kliente)\n";
+                        sendto(sockfd, msg.c_str(), msg.size(), 0, (sockaddr*)&client_addr, addrlen);
+                        continue;
+                    }
+                    Client c;
+                    c.ip = inet_ntoa(client_addr.sin_addr);
+                    c.port = ntohs(client_addr.sin_port);
+                    c.is_admin = (c.ip == SERVER_IP);
+                    c.last_active = steady_clock::now();
+                    clients[key] = c;
+                    cout << "Lidhur: " << c.ip << " [PORT:" << c.port << "]"
+                        << (c.is_admin ? " [ADMIN]" : " [KLIENT]")
+                        << " | Total: " << clients.size() << "/" << MAX_CLIENTS << "\n";
+                }
+
+                closesocket(sockfd);
+                WSACleanup();
+                return 0;
+            }
+
