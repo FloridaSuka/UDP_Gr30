@@ -119,3 +119,23 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
     }
 
     if (!is_admin) return "Nuk ke leje per kete veprim.\n";
+
+    if (cmd == "/download" && ss >> arg) {
+        string path = DATA_DIR + "/" + arg;
+        if (!fs::exists(path)) return "GABIM: Skedari nuk u gjet.\n";
+        string header = "DOWNLOAD_START|" + arg + "|" + to_string(fs::file_size(path)) + "\n";
+        sendto(sockfd, header.c_str(), header.size(), 0, (sockaddr*)&client_addr, sizeof(client_addr));
+        ifstream file(path, ios::binary);
+        char buf[65536];
+        while (file.read(buf, sizeof(buf)) || file.gcount()) {
+            sendto(sockfd, buf, file.gcount(), 0, (sockaddr*)&client_addr, sizeof(client_addr));
+        }
+        string end = "\nDOWNLOAD_END";
+        sendto(sockfd, end.c_str(), end.size(), 0, (sockaddr*)&client_addr, sizeof(client_addr));
+        return "";
+    }
+    if (cmd == "/upload" && ss >> arg) {
+        string content = cmdline.substr(cmdline.find(arg) + arg.length() + 1);
+        ofstream f(DATA_DIR + "/" + arg);
+        return (f << content) ? "Ngarkuar me sukses.\n" : "Ngarkimi deshtoi.\n";
+    }
