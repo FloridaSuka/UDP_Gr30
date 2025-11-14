@@ -55,3 +55,67 @@ void log_message(const string& ip, int port, const string& message) {
     if (!ts.empty() && ts.back() == '\n') ts.pop_back();
     log << "[" << ts << "] " << ip << ":" << port << " -> " << message << "\n";
 }
+
+void stats_thread() {
+    while (running) {
+        Sleep(5000);
+        lock_guard<mutex> lock(clients_mtx);
+        ofstream f(STATS_FILE, ios::app);
+        auto now = system_clock::to_time_t(system_clock::now());
+        char timebuf[100];
+        ctime_s(timebuf, sizeof(timebuf), &now);
+        f << "\n=== STATS " << timebuf << "===\n";
+        f << "Kliente aktive: " << clients.size() << " (min: " << MIN_CLIENTS << " | max: " << MAX_CLIENTS << ")\n";
+        long long total_recv = 0, total_sent = 0;
+        for (const auto& p : clients) {
+            const Client& c = p.second;
+            f << c.ip << ":" << c.port
+                << " | Admin:" << (c.is_admin ? "PO" : "JO")
+                << " | Msg:" << c.msg_count
+                << " | Recv:" << c.bytes_recv << "B | Sent:" << c.bytes_sent << "B\n";
+            total_recv += c.bytes_recv;
+            total_sent += c.bytes_sent;
+        }
+        f << "TOTAL - Recv: " << total_recv << "B | Sent: " << total_sent << "B\n";
+        f.close();
+    }
+}
+
+void cleanup_thread() {
+    while (running) {
+        Sleep(5000);
+        auto now = steady_clock::now();
+        vector<string> to_remove;
+        {
+            lock_guard<mutex> lock(clients_mtx);
+            for (const auto& p : clients) {
+                if (duration_cast<seconds>(now - p.second.last_active).count() > TIMEOUT_SEC) {
+                    to_remove.push_back(p.first);
+                }
+            }
+            for (const auto& k : to_remove) {
+                cout << "Timeout - Klienti u hoq: " << k << endl;
+                clients.erase(k);
+            }
+        }
+    }
+}
+
+string process_command(const string& cmdline, bool is_admin, const sockaddr_in& client_addr) {
+    stringstream ss(cmdline);
+    string cmd, arg;
+    ss >> cmd;
+
+    if (cmd == "/list") {
+        stringstream out;
+        for (const auto& e : fs::directory_iterator(DATA_DIR))
+            out << e.path().filename().string() << "\n";
+        return out.str().empty() ? "Nuk ka skedare.\n" : out.str();
+    }
+    if (cmd == "/read") {
+        ss >> arg;
+        ifstream f(DATA_DIR + "/" + arg);
+        return f ? string((istreambuf_iterator<char>(f)), {}) + "\n" : "GABIM: Skedari nuk u gjet.\n";
+    }
+
+    if (!is_admin) return "Nuk ke leje per kete veprim.\n";
