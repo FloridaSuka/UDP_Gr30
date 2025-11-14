@@ -208,6 +208,46 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
                         << (c.is_admin ? " [ADMIN]" : " [KLIENT]")
                         << " | Total: " << clients.size() << "/" << MAX_CLIENTS << "\n";
                 }
+                cl = &clients[key];
+                cl->port = ntohs(client_addr.sin_port);  
+                if (request != "PING") cl->last_active = steady_clock::now();
+                cl->msg_count++;
+                cl->bytes_recv += n;
+
+                is_admin = cl->is_admin;
+                client_port = cl->port;
+
+                if (clients.size() < MIN_CLIENTS && request != "PING") {
+                    string msg = "Ne pritje: Duhet minimumi " + to_string(MIN_CLIENTS) + " kliente (tani: " + to_string(clients.size()) + ")\n";
+                    sendto(sockfd, msg.c_str(), msg.size(), 0, (sockaddr*)&client_addr, addrlen);
+                    continue;
+                }
+            }
+
+            if (!cl) continue;
+
+            string response;
+            if (request.rfind("/", 0) != 0) {
+                cout << "MESAZH I MARRË: [" << cl->ip << ":" << client_port << "] " << request << endl;
+                response = "";
+            }
+            else {
+                if (!is_admin && request != "/list" && request.rfind("/read ", 0) != 0) {
+                    Sleep(40);
+                }
+                response = process_command(request, is_admin, client_addr);
+            }
+
+            if (!response.empty()) {
+                lock_guard<mutex> lock(clients_mtx);
+                cl->bytes_sent += response.size();
+
+                sockaddr_in reply_addr = client_addr;
+                reply_addr.sin_port = htons(cl->port);
+
+                sendto(sockfd, response.c_str(), response.size(), 0, (sockaddr*)&reply_addr, sizeof(reply_addr));
+            }
+        }
 
                 closesocket(sockfd);
                 WSACleanup();
