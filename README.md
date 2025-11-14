@@ -14,12 +14,12 @@ Programi përbëhet nga një server UDP dhe një klient i thjeshtë që realizon
 * Klientët (client): 
     * __/list__ → shfaq listën e skedarëve në server
     * __/read__ → Shfaq përmbajtjen e file-it  
-    * __/download__ 'emri' → lexon dhe shfaq përmbajtjen e një skedari
-    * __/search__ 'fjal' → kërkon skedarë që përmbajnë fjalën në emër
-    * __/info__ 'emri' → tregon madhësinë dhe datën e modifikimit të skedarit
     * __exit__ Ndal lidhjen
 * Administratori:
     * __/upload__ 'emri' 'përmbajtja' → ngarkon një skedar të ri në server
+    * __/download__ 'emri' → lexon dhe shfaq përmbajtjen e një skedari
+    * __/search__ 'fjal' → kërkon skedarë që përmbajnë fjalën në emër
+    * __/info__ 'emri' → tregon madhësinë dhe datën e modifikimit të skedarit
     * __/delete__ 'emri' → fshin një skedar nga serveri
     * __/stats__ → shfaq të gjitha statistikat aktuale dhe historike të serverit direkt në klient
 
