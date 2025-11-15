@@ -22,5 +22,27 @@ Programi përbëhet nga një server UDP dhe një klient i thjeshtë që realizon
     * __/info__ 'emri' → tregon madhësinë dhe datën e modifikimit të skedarit
     * __/delete__ 'emri' → fshin një skedar nga serveri
     * __/stats__ → shfaq të gjitha statistikat aktuale dhe historike të serverit direkt në klient
-
+* Serveri:
+    Ruajnë të gjitha mesazhet në chat_log.txt
+    Ruajnë statistika çdo 5 sekonda në server_stats.txt
+    Tregon sa klientë janë aktivë
+    Sa byte kanë dërguar/marrë
+    Kush është admin
+    Kush është aktiv
+    Bën timeout të klientëve joaktivë  
 ----
+### Startimi i programit:
+    Starto serverin
+ ```
+server.exe
+```
+Serveri nis dhe pret klientë.
+    
+     Starto klientin
+
+ ```
+client.exe
+```
+Klienti tregon:
+IP-n lokale
+nëse je ADMIN apo KLIENT i thjeshtë
