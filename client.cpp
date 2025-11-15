@@ -129,3 +129,69 @@ int main() {
         }
 
         clear_socket_buffer(sock);
+        if (is_admin && line.substr(0, 10) == "/download ") {
+            string filename = line.substr(10);
+            ofstream out(filename, ios::binary);
+            if (!out) {
+                cout << "Gabim: Nuk krijohet skedari.\n> " << flush;
+                continue;
+            }
+
+            long long total = 0;
+            bool ended = false;
+            while (!ended) {
+                tv = { 8, 0 }; FD_ZERO(&fds); FD_SET(sock, &fds);
+                if (select(0, &fds, nullptr, nullptr, &tv) <= 0) break;
+                int n = recvfrom(sock, buffer, sizeof(buffer), 0, nullptr, nullptr);
+                if (n <= 0) break;
+                string pkt(buffer, n);
+                if (pkt.find("DOWNLOAD_END") != string::npos) { ended = true; break; }
+                if (pkt.find("DOWNLOAD_START|") == 0) {
+                    size_t pos = pkt.find('\n');
+                    if (pos != string::npos && pos + 1 < (size_t)n)
+                        out.write(buffer + pos + 1, n - pos - 1);
+                }
+                else {
+                    out.write(buffer, n);
+                }
+                total += n;
+            }
+            out.close();
+            cout << "Shkarkuar: " << filename << " (" << total << " bytes)\n> " << flush;
+            continue;
+        }
+
+        string full_response;
+        bool received_something = false;
+        timeval initial_tv = { 2, 0 }; // 2 sekonda për përgjigjen e parë
+        timeval short_tv = { 0, 100000 }; // 0.1 sekonda për paketa shtesë
+
+        while (true) {
+            FD_ZERO(&fds); FD_SET(sock, &fds);
+            timeval current_tv = received_something ? short_tv : initial_tv;
+            if (select(0, &fds, nullptr, nullptr, &current_tv) <= 0) break;
+            int n = recvfrom(sock, buffer, sizeof(buffer) - 1, 0, nullptr, nullptr);
+            if (n <= 0) break;
+            buffer[n] = '\0';
+            string recv_str(buffer);
+            if (recv_str == "PONG") {
+                continue; // Injoroj PONG nga PING/PONG
+            }
+            full_response += recv_str;
+            received_something = true;
+        }
+
+        if (!full_response.empty()) {
+            cout << full_response << "\n> " << flush;
+        }
+        else {
+            cout << "> " << flush;
+        }
+
+        clear_socket_buffer(sock);
+    }
+
+    closesocket(sock);
+    WSACleanup();
+    return 0;
+}
