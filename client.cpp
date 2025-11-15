@@ -163,8 +163,8 @@ int main() {
 
         string full_response;
         bool received_something = false;
-        timeval initial_tv = { 2, 0 }; // 2 sekonda për përgjigjen e parë
-        timeval short_tv = { 0, 100000 }; // 0.1 sekonda për paketa shtesë
+        timeval initial_tv = { 2, 0 }; 
+        timeval short_tv = { 0, 100000 }; 
 
         while (true) {
             FD_ZERO(&fds); FD_SET(sock, &fds);
@@ -175,7 +175,7 @@ int main() {
             buffer[n] = '\0';
             string recv_str(buffer);
             if (recv_str == "PONG") {
-                continue; // Injoroj PONG nga PING/PONG
+                continue; 
             }
             full_response += recv_str;
             received_something = true;
