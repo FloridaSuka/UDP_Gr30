@@ -37,3 +37,17 @@ std::string get_local_ip() {
     closesocket(s);
     return std::string(ip);
 }
+
+void clear_socket_buffer(SOCKET sock) {
+    u_long bytes_available = 0;
+    if (ioctlsocket(sock, FIONREAD, &bytes_available) == 0 && bytes_available > 0) {
+        char temp[131072];
+        int to_read = (int)min(bytes_available, (u_long)sizeof(temp));
+        while (bytes_available > 0) {
+            int n = recvfrom(sock, temp, to_read, 0, nullptr, nullptr);
+            if (n <= 0) break;
+            bytes_available -= n;
+            to_read = (int)min(bytes_available, (u_long)sizeof(temp));
+        }
+    }
+}
