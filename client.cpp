@@ -1,17 +1,3 @@
-None selected
-
-Skip to content
-Using University of Prishtina Mail with screen readers
-Enable desktop notifications for University of Prishtina Mail.
-   OK  No thanks
-
-Conversations
- 
-Program Policies
-Powered by Google
-Last account activity: 1 hour ago
-Details
-// client.cpp - NJË SOCKET, PA VONESA, PA PING TË VEÇANTË
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -205,5 +191,3 @@ int main() {
     WSACleanup();
     return 0;
 }
-client.cpp
-Displaying client.cpp. 
