@@ -172,6 +172,23 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
                 out << e.path().filename().string() << "\n";
         return out.str().empty() ? "Asnje rezultat.\n" : out.str();
     }
+    if (cmd == "/info" && ss >> arg) {
+        auto p = fs::path(DATA_DIR + "/" + arg);
+        if (!fs::exists(p)) return "GABIM: Skedari nuk u gjet.\n";
+        auto sz = fs::file_size(p);
+        char tbuf[100] = {0};
+        auto file_time = fs::last_write_time(p);
+        auto sys_time = time_point_cast<system_clock::duration>(
+            file_time - fs::file_time_type::clock::now() + system_clock::now()
+        );
+        time_t tt = system_clock::to_time_t(sys_time);
+        ctime_s(tbuf, sizeof(tbuf), &tt);
+        string time_str = tbuf;
+        if (!time_str.empty() && time_str.back() == '\n') time_str.pop_back();
+        return "Emri: " + arg +
+               "\nMadhesia: " + to_string(sz) + " bytes" +
+               "\nModifikuar: " + time_str + "\n";
+    }
 }
 
     int main() {
