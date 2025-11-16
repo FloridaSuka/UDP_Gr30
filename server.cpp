@@ -189,6 +189,29 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
                "\nMadhesia: " + to_string(sz) + " bytes" +
                "\nModifikuar: " + time_str + "\n";
     }
+    if (cmd == "/stats") {
+        stringstream out;
+        auto now = system_clock::to_time_t(system_clock::now());
+        char timebuf[100];
+        ctime_s(timebuf, sizeof(timebuf), &now);
+        out << "=== STATS LIVE " << timebuf << "===\n";
+        out << "Kliente aktive: " << clients.size() << " (min: " << MIN_CLIENTS << " | max: " << MAX_CLIENTS << ")\n";
+        long long total_recv = 0, total_sent = 0;
+        for (const auto& p : clients) {
+            const Client& c = p.second;
+            out << c.ip << ":" << c.port
+                << " | Admin:" << (c.is_admin ? "PO" : "JO")
+                << " | Msg:" << c.msg_count
+                << " | Recv:" << c.bytes_recv << "B | Sent:" << c.bytes_sent << "B\n";
+            total_recv += c.bytes_recv;
+            total_sent += c.bytes_sent;
+        }
+        out << "TOTAL - Recv: " << total_recv << "B | Sent: " << total_sent << "B\n";
+        return out.str();
+    }
+    if (cmd == "PING") return "PONG to PONG";
+
+    return "Komande e panjohur.\n";
 }
 
     int main() {
