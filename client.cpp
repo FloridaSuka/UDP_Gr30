@@ -12,7 +12,7 @@
 #pragma comment(lib, "Ws2_32.lib")
 using namespace std;
 
-const string SERVER_IP = "192.168.178.36";
+const string SERVER_IP = "10.114.74.204";
 const int SERVER_PORT = 8080;
 
 std::string get_local_ip() {
@@ -38,23 +38,9 @@ std::string get_local_ip() {
     return std::string(ip);
 }
 
-void clear_socket_buffer(SOCKET sock) {
-    u_long bytes_available = 0;
-    if (ioctlsocket(sock, FIONREAD, &bytes_available) == 0 && bytes_available > 0) {
-        char temp[131072];
-        int to_read = (int)min(bytes_available, (u_long)sizeof(temp));
-        while (bytes_available > 0) {
-            int n = recvfrom(sock, temp, to_read, 0, nullptr, nullptr);
-            if (n <= 0) break;
-            bytes_available -= n;
-            to_read = (int)min(bytes_available, (u_long)sizeof(temp));
-        }
-    }
-}  
-
 int main() {
     WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+    if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
         cerr << "WSAStartup deshtoi!\n";
         return 1;
     }
@@ -89,106 +75,87 @@ int main() {
 
     if (is_admin) {
         cout << "ADMIN: /list, /read, /stats, /search, /download, /upload, /delete, exit + chat\n";
-    }
-    else {
-        cout << "KLIENT: /list, /read, exit + dërgo tekst (p.sh. 'hello')\n";
+    } else {
+        cout << "KLIENT: /list, /read, exit + dërgo tekst\n";
     }
     cout << "> " << flush;
 
-    
+    // PING thread
     thread([&]() {
         while (true) {
             sendto(sock, "PING", 4, 0, (sockaddr*)&serv, sizeof(serv));
             Sleep(8000);
         }
-        }).detach();
+    }).detach();
 
     string line;
     char buffer[131072];
     fd_set fds;
     timeval tv;
 
+    // THREAD që dëgjon mesazhet spontane nga serveri
+thread([&]() {
+    char buf[4096];
+    sockaddr_in from;
+    int fromlen = sizeof(from);
+
+    while (true) {
+        int n = recvfrom(sock, buf, sizeof(buf)-1, 0, (sockaddr*)&from, &fromlen);
+        if (n <= 0) continue;
+
+        buf[n] = '\0';
+        string msg(buf);
+
+        // Injoro PONG
+        if (msg == "PONG") continue;
+
+        // MOS E FSHIJ — printo direkt
+        cout << "\n" << msg << "\n> " << flush;
+    }
+}).detach();
+
+
     while (getline(cin, line)) {
         if (line == "exit") break;
         if (line.empty()) { cout << "> " << flush; continue; }
 
         if (!is_admin) {
-            if (line == "/list" || line == "/read" || line.rfind("/read ", 0) == 0) {
-            }
+            if (line == "/list" || line == "/read" || line.rfind("/read", 0) == 0) {}
             else if (line.rfind("/", 0) == 0) {
-                cout << "Gabim: Komandë e palejuar. Përdor vetëm /list, /read, ose dërgo tekst.\n> " << flush;
+                cout << "Gabim: Komandë e palejuar.\n> " << flush;
                 continue;
             }
         }
 
         sendto(sock, line.c_str(), (int)line.size(), 0, (sockaddr*)&serv, sizeof(serv));
 
-        if (line.rfind("/", 0) != 0) {
-            cout << "> " << flush;
-            continue;
-        }
-
-        clear_socket_buffer(sock);
-        if (is_admin && line.substr(0, 10) == "/download ") {
-            string filename = line.substr(10);
-            ofstream out(filename, ios::binary);
-            if (!out) {
-                cout << "Gabim: Nuk krijohet skedari.\n> " << flush;
-                continue;
-            }
-
-            long long total = 0;
-            bool ended = false;
-            while (!ended) {
-                tv = { 8, 0 }; FD_ZERO(&fds); FD_SET(sock, &fds);
-                if (select(0, &fds, nullptr, nullptr, &tv) <= 0) break;
-                int n = recvfrom(sock, buffer, sizeof(buffer), 0, nullptr, nullptr);
-                if (n <= 0) break;
-                string pkt(buffer, n);
-                if (pkt.find("DOWNLOAD_END") != string::npos) { ended = true; break; }
-                if (pkt.find("DOWNLOAD_START|") == 0) {
-                    size_t pos = pkt.find('\n');
-                    if (pos != string::npos && pos + 1 < (size_t)n)
-                        out.write(buffer + pos + 1, n - pos - 1);
-                }
-                else {
-                    out.write(buffer, n);
-                }
-                total += n;
-            }
-            out.close();
-            cout << "Shkarkuar: " << filename << " (" << total << " bytes)\n> " << flush;
-            continue;
-        }
-
         string full_response;
         bool received_something = false;
-        timeval initial_tv = { 2, 0 }; 
-        timeval short_tv = { 0, 100000 }; 
+        timeval initial_tv = {2, 0};
+        timeval short_tv = {0, 100000};
 
         while (true) {
-            FD_ZERO(&fds); FD_SET(sock, &fds);
+            FD_ZERO(&fds);
+            FD_SET(sock, &fds);
             timeval current_tv = received_something ? short_tv : initial_tv;
+
             if (select(0, &fds, nullptr, nullptr, &current_tv) <= 0) break;
-            int n = recvfrom(sock, buffer, sizeof(buffer) - 1, 0, nullptr, nullptr);
+
+            int n = recvfrom(sock, buffer, sizeof(buffer)-1, 0, nullptr, nullptr);
             if (n <= 0) break;
+
             buffer[n] = '\0';
-            string recv_str(buffer);
-            if (recv_str == "PONG") {
-                continue; 
-            }
-            full_response += recv_str;
+            string s(buffer);
+            if (s == "PONG") continue;
+
+            full_response += s;
             received_something = true;
         }
 
-        if (!full_response.empty()) {
+        if (!full_response.empty())
             cout << full_response << "\n> " << flush;
-        }
-        else {
+        else
             cout << "> " << flush;
-        }
-
-        clear_socket_buffer(sock);
     }
 
     closesocket(sock);
