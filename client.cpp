@@ -1,3 +1,4 @@
+// client.cpp
 #define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -11,7 +12,7 @@
 #pragma comment(lib, "Ws2_32.lib")
 using namespace std;
 
-const string SERVER_IP = "192.168.178.36";
+const string SERVER_IP = "10.114.74.204";
 const int SERVER_PORT = 8080;
 
 void clear_socket_buffer(SOCKET sock) {
@@ -53,7 +54,7 @@ std::string get_local_ip() {
 
 int main() {
     WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
         cerr << "WSAStartup deshtoi!\n";
         return 1;
     }
@@ -88,18 +89,18 @@ int main() {
 
     if (is_admin) {
         cout << "ADMIN: /list, /read, /stats, /search, /download, /upload, /delete, exit + chat\n";
-    } else {
-        cout << "KLIENT: /list, /read, exit + dërgo tekst (p.sh. 'hello')\n";
+    }
+    else {
+        cout << "KLIENT: /list, /read, exit + dergo tekst (p.sh. 'hello')\n";
     }
     cout << "> " << flush;
 
-    // PING THREAD (në të njëjtin socket)
     thread([&]() {
         while (true) {
             sendto(sock, "PING", 4, 0, (sockaddr*)&serv, sizeof(serv));
             Sleep(8000);
         }
-    }).detach();
+        }).detach();
 
     string line;
     char buffer[131072];
@@ -112,8 +113,9 @@ int main() {
 
         if (!is_admin) {
             if (line == "/list" || line == "/read" || line.rfind("/read ", 0) == 0) {
-            } else if (line.rfind("/", 0) == 0) {
-                cout << "Gabim: Komandë e palejuar. Përdor vetëm /list, /read, ose dërgo tekst.\n> " << flush;
+            }
+            else if (line.rfind("/", 0) == 0) {
+                cout << "Gabim: Komande e palejuar. Perdor vetem /list, /read, ose dergo tekst.\n> " << flush;
                 continue;
             }
         }
@@ -138,7 +140,7 @@ int main() {
             long long total = 0;
             bool ended = false;
             while (!ended) {
-                tv = {8, 0}; FD_ZERO(&fds); FD_SET(sock, &fds);
+                tv = { 8, 0 }; FD_ZERO(&fds); FD_SET(sock, &fds);
                 if (select(0, &fds, nullptr, nullptr, &tv) <= 0) break;
                 int n = recvfrom(sock, buffer, sizeof(buffer), 0, nullptr, nullptr);
                 if (n <= 0) break;
@@ -148,7 +150,8 @@ int main() {
                     size_t pos = pkt.find('\n');
                     if (pos != string::npos && pos + 1 < (size_t)n)
                         out.write(buffer + pos + 1, n - pos - 1);
-                } else {
+                }
+                else {
                     out.write(buffer, n);
                 }
                 total += n;
@@ -160,19 +163,19 @@ int main() {
 
         string full_response;
         bool received_something = false;
-        timeval initial_tv = {2, 0}; // 2 sekonda për përgjigjen e parë
-        timeval short_tv = {0, 100000}; // 0.1 sekonda për paketa shtesë
+        timeval initial_tv = { 2, 0 }; 
+        timeval short_tv = { 0, 100000 }; 
 
         while (true) {
             FD_ZERO(&fds); FD_SET(sock, &fds);
             timeval current_tv = received_something ? short_tv : initial_tv;
             if (select(0, &fds, nullptr, nullptr, &current_tv) <= 0) break;
-            int n = recvfrom(sock, buffer, sizeof(buffer)-1, 0, nullptr, nullptr);
+            int n = recvfrom(sock, buffer, sizeof(buffer) - 1, 0, nullptr, nullptr);
             if (n <= 0) break;
             buffer[n] = '\0';
             string recv_str(buffer);
             if (recv_str == "PONG") {
-                continue; // Injoroj PONG nga PING/PONG
+                continue; 
             }
             full_response += recv_str;
             received_something = true;
@@ -180,7 +183,8 @@ int main() {
 
         if (!full_response.empty()) {
             cout << full_response << "\n> " << flush;
-        } else {
+        }
+        else {
             cout << "> " << flush;
         }
 

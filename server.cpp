@@ -1,3 +1,4 @@
+// server.cpp 
 #define _CRT_SECURE_NO_WARNINGS
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -16,10 +17,10 @@ namespace fs = std::filesystem;
 using namespace std::chrono;
 using namespace std;
 
-const string SERVER_IP = "192.168.178.36";
+const string SERVER_IP = "10.114.74.204";
 const int SERVER_PORT = 8080;
-const int MIN_CLIENTS = 2;
-const int MAX_CLIENTS = 3;
+const int MIN_CLIENTS = 4;
+const int MAX_CLIENTS = 6;
 const int TIMEOUT_SEC = 30;
 const string DATA_DIR = "server_files";
 const string STATS_FILE = "server_stats.txt";
@@ -70,9 +71,9 @@ void stats_thread() {
         for (const auto& p : clients) {
             const Client& c = p.second;
             f << c.ip << ":" << c.port
-              << " | Admin:" << (c.is_admin ? "PO" : "JO")
-              << " | Msg:" << c.msg_count
-              << " | Recv:" << c.bytes_recv << "B | Sent:" << c.bytes_sent << "B\n";
+                << " | Admin:" << (c.is_admin ? "PO" : "JO")
+                << " | Msg:" << c.msg_count
+                << " | Recv:" << c.bytes_recv << "B | Sent:" << c.bytes_sent << "B\n";
             total_recv += c.bytes_recv;
             total_sent += c.bytes_sent;
         }
@@ -153,7 +154,7 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
         auto p = fs::path(DATA_DIR + "/" + arg);
         if (!fs::exists(p)) return "GABIM: Skedari nuk u gjet.\n";
         auto sz = fs::file_size(p);
-        char tbuf[100] = {0};
+        char tbuf[100] = { 0 };
         auto file_time = fs::last_write_time(p);
         auto sys_time = time_point_cast<system_clock::duration>(
             file_time - fs::file_time_type::clock::now() + system_clock::now()
@@ -163,8 +164,8 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
         string time_str = tbuf;
         if (!time_str.empty() && time_str.back() == '\n') time_str.pop_back();
         return "Emri: " + arg +
-               "\nMadhesia: " + to_string(sz) + " bytes" +
-               "\nModifikuar: " + time_str + "\n";
+            "\nMadhesia: " + to_string(sz) + " bytes" +
+            "\nModifikuar: " + time_str + "\n";
     }
     if (cmd == "/stats") {
         stringstream out;
@@ -193,7 +194,7 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
 
 int main() {
     WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
         cerr << "WSAStartup deshtoi!\n";
         return 1;
     }
@@ -222,7 +223,7 @@ int main() {
     int addrlen = sizeof(client_addr);
 
     while (running) {
-        int n = recvfrom(sockfd, buffer, sizeof(buffer)-1, 0, (sockaddr*)&client_addr, &addrlen);
+        int n = recvfrom(sockfd, buffer, sizeof(buffer) - 1, 0, (sockaddr*)&client_addr, &addrlen);
         if (n <= 0) continue;
         buffer[n] = '\0';
         string request(buffer);
@@ -257,12 +258,12 @@ int main() {
                 c.last_active = steady_clock::now();
                 clients[key] = c;
                 cout << "Lidhur: " << c.ip << " [PORT:" << c.port << "]"
-                     << (c.is_admin ? " [ADMIN]" : " [KLIENT]")
-                     << " | Total: " << clients.size() << "/" << MAX_CLIENTS << "\n";
+                    << (c.is_admin ? " [ADMIN]" : " [KLIENT]")
+                    << " | Total: " << clients.size() << "/" << MAX_CLIENTS << "\n";
             }
 
             cl = &clients[key];
-            cl->port = ntohs(client_addr.sin_port);  // PORTI I FUNDIT = CMD_SOCK
+            cl->port = ntohs(client_addr.sin_port); 
             if (request != "PING") cl->last_active = steady_clock::now();
             cl->msg_count++;
             cl->bytes_recv += n;
@@ -283,7 +284,8 @@ int main() {
         if (request.rfind("/", 0) != 0) {
             cout << "MESAZH I MARRË: [" << cl->ip << ":" << client_port << "] " << request << endl;
             response = "";
-        } else {
+        }
+        else {
             if (!is_admin && request != "/list" && request.rfind("/read ", 0) != 0) {
                 Sleep(40);
             }
@@ -294,7 +296,6 @@ int main() {
             lock_guard<mutex> lock(clients_mtx);
             cl->bytes_sent += response.size();
 
-            // DËRGO NË PORTIN E FUNDIT (CMD_SOCK)
             sockaddr_in reply_addr = client_addr;
             reply_addr.sin_port = htons(cl->port);
 
