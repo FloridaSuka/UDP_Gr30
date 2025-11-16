@@ -11,11 +11,13 @@
 #include <thread>
 #include <sstream>
 #include <mutex>
+#include <queue>
 #pragma comment(lib, "Ws2_32.lib")
 namespace fs = std::filesystem;
 using namespace std::chrono;
 using namespace std;
 
+queue<string> waiting_list;
 const string SERVER_IP = "192.168.178.36";
 const int SERVER_PORT = 8080;
 const int MIN_CLIENTS = 2;
@@ -42,7 +44,7 @@ SOCKET sockfd;
 string addr_key(const sockaddr_in& addr) {
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &addr.sin_addr, ip, INET_ADDRSTRLEN);
-    return string(ip);
+    return string(ip) + ":" + to_string(ntohs(addr.sin_port));
 }
 
 void log_message(const string& ip, int port, const string& message) {
@@ -97,6 +99,27 @@ void cleanup_thread() {
                 cout << "Timeout - Klienti u hoq: " << k << endl;
                 clients.erase(k);
             }
+            // Nëse ka klienta në pritje, aktivizo njërin
+            while (clients.size() < MAX_CLIENTS && !waiting_list.empty()) {
+                string next_key = waiting_list.front();
+                waiting_list.pop();
+
+                cout << "Aktivizim i klientit nga lista e pritjes: " << next_key << endl;
+
+                // Rikrijo Client-in nga IP që kemi ruajtur si string "ip"
+                sockaddr_in fake_addr{};
+                fake_addr.sin_family = AF_INET;
+                inet_pton(AF_INET, next_key.c_str(), &fake_addr.sin_addr);
+                fake_addr.sin_port = 0; // do të përditësohet në mesazhin e radhës
+
+                Client c;
+                c.ip = next_key;
+                c.port = 0;
+                c.is_admin = (c.ip == SERVER_IP);
+                c.last_active = steady_clock::now();
+                clients[next_key] = c;
+            }
+
         }
     }
 }
@@ -193,21 +216,29 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
                 }
 
                 if (clients.find(key) == clients.end()) {
-                    if (clients.size() >= MAX_CLIENTS) {
-                        string msg = "GABIM: Serveri plot (maksimumi " + to_string(MAX_CLIENTS) + " kliente)\n";
+
+                    // Ka vend? Fut klientin brenda
+                    if (clients.size() < MAX_CLIENTS) {
+                        Client c;
+                        c.ip = inet_ntoa(client_addr.sin_addr);
+                        c.port = ntohs(client_addr.sin_port);
+                        c.is_admin = (c.ip == SERVER_IP);
+                        c.last_active = steady_clock::now();
+                        clients[key] = c;
+
+                        cout << "Lidhur: " << c.ip << " [PORT:" << c.port << "]"
+                            << (c.is_admin ? " [ADMIN]" : " [KLIENT]")
+                            << " | Total: " << clients.size() << "/" << MAX_CLIENTS << endl;
+                    }
+                    else {
+                        // Nuk ka vend ? shtoje klientin në pritje
+                        waiting_list.push(key);
+                        string msg = "Ne pritje: Serveri eshte i mbushur. Ju lutem prisni...\n";
                         sendto(sockfd, msg.c_str(), msg.size(), 0, (sockaddr*)&client_addr, addrlen);
                         continue;
                     }
-                    Client c;
-                    c.ip = inet_ntoa(client_addr.sin_addr);
-                    c.port = ntohs(client_addr.sin_port);
-                    c.is_admin = (c.ip == SERVER_IP);
-                    c.last_active = steady_clock::now();
-                    clients[key] = c;
-                    cout << "Lidhur: " << c.ip << " [PORT:" << c.port << "]"
-                        << (c.is_admin ? " [ADMIN]" : " [KLIENT]")
-                        << " | Total: " << clients.size() << "/" << MAX_CLIENTS << "\n";
                 }
+
                 cl = &clients[key];
                 cl->port = ntohs(client_addr.sin_port);  
                 if (request != "PING") cl->last_active = steady_clock::now();
@@ -232,7 +263,7 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
                 response = "";
             }
             else {
-                if (!is_admin && request != "/list" && request.rfind("/read ", 0) != 0) {
+                if (!is_admin) {
                     Sleep(40);
                 }
                 response = process_command(request, is_admin, client_addr);
