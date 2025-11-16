@@ -1,5 +1,6 @@
 // server.cpp 
 #define _CRT_SECURE_NO_WARNINGS
+#include <vector>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
