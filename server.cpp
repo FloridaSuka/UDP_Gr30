@@ -99,18 +99,18 @@ void cleanup_thread() {
                 cout << "Timeout - Klienti u hoq: " << k << endl;
                 clients.erase(k);
             }
-            // Nëse ka klienta në pritje, aktivizo njërin
+            // Nï¿½se ka klienta nï¿½ pritje, aktivizo njï¿½rin
             while (clients.size() < MAX_CLIENTS && !waiting_list.empty()) {
                 string next_key = waiting_list.front();
                 waiting_list.pop();
 
                 cout << "Aktivizim i klientit nga lista e pritjes: " << next_key << endl;
 
-                // Rikrijo Client-in nga IP që kemi ruajtur si string "ip"
+                // Rikrijo Client-in nga IP qï¿½ kemi ruajtur si string "ip"
                 sockaddr_in fake_addr{};
                 fake_addr.sin_family = AF_INET;
                 inet_pton(AF_INET, next_key.c_str(), &fake_addr.sin_addr);
-                fake_addr.sin_port = 0; // do të përditësohet në mesazhin e radhës
+                fake_addr.sin_port = 0; // do tï¿½ pï¿½rditï¿½sohet nï¿½ mesazhin e radhï¿½s
 
                 Client c;
                 c.ip = next_key;
@@ -161,7 +161,19 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
         string content = cmdline.substr(cmdline.find(arg) + arg.length() + 1);
         ofstream f(DATA_DIR + "/" + arg);
         return (f << content) ? "Ngarkuar me sukses.\n" : "Ngarkimi deshtoi.\n";
+    }    
+    if (cmd == "/delete" && ss >> arg) {
+        return fs::remove(DATA_DIR + "/" + arg) ? "Fshire.\n" : "Fshirja deshtoi.\n";
     }
+    if (cmd == "/search" && ss >> arg) {
+        stringstream out;
+        for (const auto& e : fs::directory_iterator(DATA_DIR))
+            if (e.path().filename().string().find(arg) != string::npos)
+                out << e.path().filename().string() << "\n";
+        return out.str().empty() ? "Asnje rezultat.\n" : out.str();
+    }
+}
+
     int main() {
         WSADATA wsa;
         if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
@@ -231,7 +243,7 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
                             << " | Total: " << clients.size() << "/" << MAX_CLIENTS << endl;
                     }
                     else {
-                        // Nuk ka vend ? shtoje klientin në pritje
+                        // Nuk ka vend ? shtoje klientin nï¿½ pritje
                         waiting_list.push(key);
                         string msg = "Ne pritje: Serveri eshte i mbushur. Ju lutem prisni...\n";
                         sendto(sockfd, msg.c_str(), msg.size(), 0, (sockaddr*)&client_addr, addrlen);
@@ -259,7 +271,7 @@ string process_command(const string& cmdline, bool is_admin, const sockaddr_in& 
 
             string response;
             if (request.rfind("/", 0) != 0) {
-                cout << "MESAZH I MARRË: [" << cl->ip << ":" << client_port << "] " << request << endl;
+                cout << "MESAZH I MARRï¿½: [" << cl->ip << ":" << client_port << "] " << request << endl;
                 response = "";
             }
             else {
